@@ -249,17 +249,19 @@
 				continue
 
 			// If it's blocked, go home
-			if(!CAN_STEP(next_turf, adjacent, simulated_only, pass_info, avoid))
+			var/movement_dir = get_dir(next_turf, adjacent)
+			if(!NAV_CAN_STEP(next_turf, adjacent, movement_dir, pass_info, avoid))
 				continue
 			// I want to prevent diagonal moves around corners
 			// We do this first because blocked diagonals are more common then non blocked ones.
 			if(next_turf.x != adjacent.x && next_turf.y != adjacent.y)
-				var/movement_dir = get_dir(next_turf, adjacent)
 				// If either of the move components would bump into something, replace it with an explicit move around
-				var/turf/vertical_move = get_step(next_turf, movement_dir & (NORTH|SOUTH))
-				var/turf/horizontal_move = get_step(next_turf, movement_dir & (EAST|WEST))
+				var/vertical_dir = movement_dir & (NORTH|SOUTH)
+				var/horizontal_dir = movement_dir & (EAST|WEST)
+				var/turf/vertical_move = get_step(next_turf, vertical_dir)
+				var/turf/horizontal_move = get_step(next_turf, horizontal_dir)
 				if(!working_queue[vertical_move])
-					if(CAN_STEP(next_turf, vertical_move, simulated_only, pass_info, avoid))
+					if(NAV_CAN_STEP(next_turf, vertical_move, vertical_dir, pass_info, avoid))
 						working_queue[vertical_move] = next_turf
 						working_distances += distance
 					else
@@ -269,7 +271,7 @@
 							working_distances += distance
 						continue
 				if(!working_queue[horizontal_move])
-					if(CAN_STEP(next_turf, horizontal_move, simulated_only, pass_info, avoid))
+					if(NAV_CAN_STEP(next_turf, horizontal_move, horizontal_dir, pass_info, avoid))
 						working_queue[horizontal_move] = next_turf
 						working_distances += distance
 					else

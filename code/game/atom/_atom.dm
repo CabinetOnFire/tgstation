@@ -718,6 +718,10 @@
 	. = density
 	density = new_value
 	SEND_SIGNAL(src, COMSIG_ATOM_DENSITY_CHANGED)
+	// Notify the navmesh that connections through this atom's turf may have changed.
+	// Type B gate handlers on existing gates update their is_open cache via COMSIG_ATOM_DENSITY_CHANGED;
+	// this call ensures stale gates or newly dense objects also trigger a full turf rebuild.
+	SSnavmesh.invalidate_turf(get_turf(src))
 
 ///Setter for the `base_pixel_x` variable to append behavior related to its changing.
 /atom/proc/set_base_pixel_x(new_value)

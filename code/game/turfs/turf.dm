@@ -97,6 +97,16 @@ GLOBAL_LIST_EMPTY(station_turfs)
 	/// WARNING: Currently to use a density shortcircuiting this does not support dense turfs with special allow through function
 	var/pathing_pass_method = TURF_PATHING_PASS_DENSITY
 
+	/// Navmesh: 8-bit bitmask of directions a ground mover can step out of this turf into.
+	/// Bit is set at build time; cleared for walls, space, and other permanent blockers.
+	var/nav_ground_connections = 0
+	/// Navmesh: 8-bit bitmask of directions any mover (including flying) can step from this turf.
+	/// Identical to nav_ground_connections except openspace connections are included for flyers.
+	var/nav_all_connections = 0
+	/// Navmesh: optional list of /datum/nav_gate for conditional blockers (doors, windows, etc.).
+	/// null on ~99% of turfs (no gates needed in open corridors).
+	var/list/nav_gates = null
+
 #if defined(UNIT_TESTS) || defined(SPACEMAN_DMM)
 	/// For the area_contents list unit test
 	/// Allows us to know our area without needing to preassign it

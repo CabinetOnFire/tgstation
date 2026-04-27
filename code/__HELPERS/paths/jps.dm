@@ -7,9 +7,9 @@
 /// A helper macro for JPS, for telling when a node has forced neighbors that need expanding
 /// Only usable in the context of the jps datum because of the datum vars it relies on
 /// Checks if we are deviating from our "running" directions
-#define STEP_NOT_HERE_BUT_THERE(cur_turf, dirA, dirB) ((!CAN_STEP(cur_turf, get_step(cur_turf, dirA), simulated_only, pass_info, avoid) && CAN_STEP(cur_turf, get_step(cur_turf, dirB), simulated_only, pass_info, avoid)))
+#define STEP_NOT_HERE_BUT_THERE(cur_turf, dirA, dirB) ((!NAV_CAN_STEP(cur_turf, get_step(cur_turf, dirA), dirA, pass_info, avoid) && NAV_CAN_STEP(cur_turf, get_step(cur_turf, dirB), dirB, pass_info, avoid)))
 /// Checks if a border object stops our parent from reaching a turf we CAN reach
-#define TURF_CANT_WE_CAN(parent_turf, dir_parent, cur_turf, dur_cur) ((!CAN_STEP(parent_turf, get_step(parent_turf, dir_parent), simulated_only, pass_info, avoid) && CAN_STEP(cur_turf, get_step(cur_turf, dur_cur), simulated_only, pass_info, avoid)))
+#define TURF_CANT_WE_CAN(parent_turf, dir_parent, cur_turf, dur_cur) ((!NAV_CAN_STEP(parent_turf, get_step(parent_turf, dir_parent), dir_parent, pass_info, avoid) && NAV_CAN_STEP(cur_turf, get_step(cur_turf, dur_cur), dur_cur, pass_info, avoid)))
 
 
 /// The JPS Node datum represents a turf that we find interesting enough to add to the open list and possibly search for new tiles from
@@ -195,7 +195,7 @@
 		lag_turf = current_turf
 		current_turf = get_step(current_turf, heading)
 		steps_taken++
-		if(!CAN_STEP(lag_turf, current_turf, simulated_only, pass_info, avoid))
+		if(!NAV_CAN_STEP(lag_turf, current_turf, heading, pass_info, avoid))
 			return
 
 		if(current_turf == end || (mintargetdist && (get_dist(current_turf, end) <= mintargetdist) && !diagonally_blocked(current_turf, end)))
@@ -261,7 +261,7 @@
 		lag_turf = current_turf
 		current_turf = get_step(current_turf, heading)
 		steps_taken++
-		if(!CAN_STEP(lag_turf, current_turf, simulated_only, pass_info, avoid))
+		if(!NAV_CAN_STEP(lag_turf, current_turf, heading, pass_info, avoid))
 			return
 
 		if(current_turf == end || (mintargetdist && (get_dist(current_turf, end) <= mintargetdist) && !diagonally_blocked(current_turf, end)))

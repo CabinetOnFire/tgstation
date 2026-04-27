@@ -12,6 +12,28 @@
 #define CAN_STEP(cur_turf, next, simulated_only, pass_info, avoid) \
 	(next && !next.density && !(simulated_only && SSpathfinder.space_type_cache[next.type]) && (next != avoid) && !cur_turf.LinkBlockedWithAccess(next, pass_info))
 
+/**
+ * Navmesh-accelerated step check. Replaces CAN_STEP in JPS/SSSP once SSnavmesh is ready.
+ *
+ * Bypasses all per-turf content iteration: instead reads precomputed connection bitmasks
+ * and only calls into gate logic when conditional blockers (doors, windows) are present.
+ *
+ * Arguments:
+ * * src_turf  - turf we are leaving FROM
+ * * dst_turf  - turf we are moving INTO
+ * * dir       - the direction bit (NORTH/SOUTH/EAST/WEST/NORTHEAST etc.)
+ * * pass_info - /datum/can_pass_info with precomputed nav_caps
+ * * avoid     - a specific turf to skip (same semantics as CAN_STEP)
+ */
+#define NAV_CAN_STEP(src_turf, dst_turf, dir, pass_info, avoid) \
+	(dst_turf && (dst_turf != avoid) && \
+	((pass_info.nav_caps & NAV_CAP_PHASING) \
+		? TRUE \
+		: (((pass_info.nav_caps & NAV_CAP_FLYING) \
+			? src_turf.nav_all_connections \
+			: src_turf.nav_ground_connections) & (dir)) && \
+		  (!src_turf.nav_gates || navmesh_check_gates(src_turf, (dir), pass_info))))
+
 #define DIAGONAL_DO_NOTHING NONE
 #define DIAGONAL_REMOVE_ALL 1
 #define DIAGONAL_REMOVE_CLUNKY 2

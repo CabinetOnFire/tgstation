@@ -165,7 +165,7 @@
 			continue
 		//If the first diagonal movement step is invalid (north/south), replace with a sidestep first, with an implied vertical step in next_turf
 		var/vertical_only = movement_dir & (NORTH|SOUTH)
-		if(!CAN_STEP(current_turf,get_step(current_turf, vertical_only), simulated_only, pass_info, avoid))
+		if(!NAV_CAN_STEP(current_turf, get_step(current_turf, vertical_only), vertical_only, pass_info, avoid))
 			modified_path += get_step(current_turf, movement_dir & ~vertical_only)
 	modified_path += path[length(path)]
 
@@ -193,7 +193,7 @@
 			continue
 		var/vertical_only = movement_dir & (NORTH|SOUTH)
 		// If we can't go directly north/south, we will first go to the side,
-		if(!CAN_STEP(current_turf,get_step(current_turf, vertical_only), simulated_only, pass_info, avoid))
+		if(!NAV_CAN_STEP(current_turf, get_step(current_turf, vertical_only), vertical_only, pass_info, avoid))
 			modified_path += get_step(current_turf, movement_dir & ~vertical_only)
 		else // Otherwise, we'll first go north/south, then to the side
 			modified_path += get_step(current_turf, vertical_only)
@@ -316,6 +316,12 @@
 	/// Require a movable
 	var/datum/weakref/requester_ref = null
 
+	/// Navmesh capability flags (NAV_CAP_*). Computed once in New() and read by NAV_CAN_STEP.
+	/// NAV_CAP_PHASING: bypass navmesh bits entirely.
+	/// NAV_CAP_FLYING: use nav_all_connections (includes openspace / fly-only terrain).
+	/// NAV_CAP_GROUND: use nav_ground_connections (default).
+	var/nav_caps = NAV_CAP_GROUND
+
 /datum/can_pass_info/New(atom/movable/construct_from, list/access, no_id = FALSE, call_depth = 0)
 	// No infiniloops
 	if(call_depth > 10)
@@ -333,6 +339,14 @@
 	src.thrown = !!construct_from.throwing
 	src.anchored = construct_from.anchored
 	src.has_gravity = construct_from.has_gravity()
+
+	// Compute nav_caps once — used by NAV_CAN_STEP each step of the path
+	if((src.pass_flags & PASSCLOSEDTURF) || (src.movement_type & PHASING))
+		src.nav_caps = NAV_CAP_PHASING
+	else if(src.movement_type & (FLYING | FLOATING))
+		src.nav_caps = NAV_CAP_FLYING
+	// else: default NAV_CAP_GROUND already set
+
 	if(ismob(construct_from))
 		var/mob/living/mob_construct = construct_from
 		src.incapacitated = mob_construct.incapacitated

@@ -214,6 +214,9 @@ GLOBAL_LIST_INIT(blacklisted_automated_baseturfs, typecacheof(list(
 	for(var/mob/living/target in new_turf.contents)
 		target.refresh_gravity()
 
+	// Navmesh: the turf type changed, so connections from this turf and its neighbors may be stale.
+	SSnavmesh.invalidate_turf(new_turf)
+
 	return new_turf
 
 /turf/open/ChangeTurf(path, list/new_baseturfs, flags) //Resist the temptation to make this default to keeping air.
