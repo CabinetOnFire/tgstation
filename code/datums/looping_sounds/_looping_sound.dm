@@ -68,6 +68,12 @@
 	//If we reserve a random sound channel, store the channel number here so we can clean it up later.
 	var/reserved_channel
 
+	// Connect range state
+	/// List of mobs currently hearing this looping sound
+	var/list/listeners = list()
+	/// Reference to the connect_range component managing our listener range
+	var/datum/component/connect_range/connect_range_component
+
 /datum/looping_sound/New(
 	_parent,
 	start_immediately = FALSE,
@@ -84,6 +90,10 @@
 	skip_starting_sounds = _skip_starting_sounds
 	if(sound_channel)
 		src.sound_channel = sound_channel
+
+	if(parent && !isarea(parent))
+		var/static/list/range_connections = list(COMSIG_ATOM_ENTERED = PROC_REF(check_new_listener))
+		connect_range_component = AddComponent(/datum/component/connect_range, parent, range_connections, SOUND_RANGE + extra_range)
 
 	if(start_immediately)
 		start()
@@ -104,8 +114,11 @@
 	if(timer_id)
 		return
 
+	for(var/mob/nearby in hearers(SOUND_RANGE + extra_range, parent))
+		register_listener(nearby)
+
 	if(!sound_channel && reserve_random_channel)
-		sound_channel = SSsounds.reserve_sound_channel_datumless()
+		sound_channel = SSsounds.reserve_sound_channel(src)
 		reserved_channel = sound_channel
 
 	on_start()
@@ -126,6 +139,8 @@
 	deltimer(timer_id, SSsound_loops)
 	timer_id = null
 	loop_started = FALSE
+	for(var/mob/listener as anything in listeners)
+		deregister_listener(listener)
 
 	if(reserved_channel)
 		sound_channel = null
@@ -171,26 +186,25 @@
  * * volume_override - The volume we want to play the sound at, overriding the `volume` variable.
  */
 /datum/looping_sound/proc/play(soundfile, volume_override)
-	var/sound/sound_to_play = sound(soundfile)
-	sound_to_play.channel = sound_channel || SSsounds.random_available_channel()
-	sound_to_play.volume = volume_override || volume //Use volume as fallback if theres no override
 	if(direct)
+		var/sound/sound_to_play = sound(soundfile)
+		sound_to_play.channel = sound_channel || SSsounds.random_available_channel()
+		sound_to_play.volume = volume_override || volume
 		SEND_SOUND(parent, sound_to_play)
-	else
-		playsound(
-			parent,
-			sound_to_play,
-			volume,
-			vary,
-			extra_range,
-			falloff_exponent = falloff_exponent,
-			channel = sound_to_play.channel,
-			pressure_affected = pressure_affected,
-			ignore_walls = ignore_walls,
-			falloff_distance = falloff_distance,
-			use_reverb = use_reverb,
-			channel = sound_channel || SSsounds.random_available_channel()
-		)
+		return
+
+	for(var/mob/listener as anything in listeners)
+		var/sound/listener_sound = listeners[listener]
+		if(!listener_sound)
+			listener_sound = sound(soundfile)
+			listener_sound.channel = sound_channel || SSsounds.random_available_channel()
+			listener_sound.volume = volume_override || volume
+			listener_sound.status = SOUND_UPDATE
+			listeners[listener] = listener_sound
+		else
+			listener_sound.file = soundfile
+			listener_sound.volume = volume_override || volume
+		update_listener(listener)
 
 /// Returns the sound we should now be playing.
 /datum/looping_sound/proc/get_sound(_mid_sounds)
@@ -246,12 +260,12 @@
 	else
 		start_sound_loop()
 
-/// Stops sound playing on current channel, if specified
+/// Stops sound playing on current channel for all listeners
 /datum/looping_sound/proc/stop_current()
-	if(!sound_channel || !ismob(parent))
+	if(!sound_channel)
 		return
-	var/mob/mob_parent = parent
-	mob_parent.stop_sound_channel(sound_channel)
+	for(var/mob/listener as anything in listeners)
+		listener.stop_sound_channel(sound_channel)
 
 /// Simple proc that's executed when the looping sound is stopped, so that the `end_sound` can be played, if there's one.
 /datum/looping_sound/proc/on_stop()
@@ -261,10 +275,17 @@
 /// A simple proc to change who our parent is set to, also handling registering and unregistering the QDELETING signals on the parent.
 /datum/looping_sound/proc/set_parent(new_parent)
 	if(parent)
-		UnregisterSignal(parent, COMSIG_QDELETING)
+		UnregisterSignal(parent, list(COMSIG_QDELETING, COMSIG_MOVABLE_MOVED))
+	if(connect_range_component)
+		qdel(connect_range_component)
+		connect_range_component = null
 	parent = new_parent
 	if(parent)
 		RegisterSignal(parent, COMSIG_QDELETING, PROC_REF(handle_parent_del))
+		RegisterSignal(parent, COMSIG_MOVABLE_MOVED, PROC_REF(parent_moved))
+	if(parent && !isarea(parent))
+		var/static/list/range_connections = list(COMSIG_ATOM_ENTERED = PROC_REF(check_new_listener))
+		connect_range_component = AddComponent(/datum/component/connect_range, parent, range_connections, SOUND_RANGE + extra_range)
 
 /// A simple proc that lets us know whether the sounds are currently active or not.
 /datum/looping_sound/proc/is_active()
@@ -274,3 +295,63 @@
 /datum/looping_sound/proc/handle_parent_del(datum/source)
 	SIGNAL_HANDLER
 	set_parent(null)
+
+/// Called by connect_range when a mob enters the sound's range.
+/datum/looping_sound/proc/check_new_listener(datum/source, atom/movable/entered)
+	SIGNAL_HANDLER
+	if(!loop_started)
+		return
+	if(!ismob(entered))
+		return
+	if(entered in listeners)
+		return
+	register_listener(entered)
+
+/// Registers a new listener mob, creating their sound object and wiring up signals.
+/datum/looping_sound/proc/register_listener(mob/new_listener)
+	listeners[new_listener] = NONE
+	RegisterSignal(new_listener, COMSIG_QDELETING, PROC_REF(listener_deleted))
+	RegisterSignal(new_listener, COMSIG_MOVABLE_MOVED, PROC_REF(listener_moved))
+
+/// Called when a listener moves, updates the sound's relative position.
+/datum/looping_sound/proc/listener_moved(datum/source, ...)
+	SIGNAL_HANDLER
+	if(!listeners[source])
+		return
+	update_listener(source)
+
+/// Called when a listener is deleted, cleans up signals and sound.
+/datum/looping_sound/proc/listener_deleted(datum/source)
+	SIGNAL_HANDLER
+	deregister_listener(source)
+
+/// Deregisters a listener, cleaning up signals and stopping their sound.
+/datum/looping_sound/proc/deregister_listener(mob/no_longer_listening)
+	UnregisterSignal(no_longer_listening, list(COMSIG_QDELETING, COMSIG_MOVABLE_MOVED))
+	if(sound_channel)
+		no_longer_listening.stop_sound_channel(sound_channel)
+	listeners -= no_longer_listening
+
+/// Updates a single listener's sound position and sends it.
+/datum/looping_sound/proc/update_listener(mob/listener)
+	var/sound/listener_sound = listeners[listener]
+	if(!listener_sound)
+		return
+	var/turf/source_turf = get_turf(parent)
+	var/turf/listener_turf = get_turf(listener)
+	if(source_turf && listener_turf && source_turf.z == listener_turf.z)
+		listener_sound.x = source_turf.x - listener_turf.x
+		listener_sound.z = source_turf.y - listener_turf.y
+	else
+		listener_sound.volume = 0
+	SEND_SOUND(listener, listener_sound)
+
+/// Updates all listeners' sound positions.
+/datum/looping_sound/proc/update_all()
+	for(var/mob/listener as anything in listeners)
+		update_listener(listener)
+
+/// Called when the parent moves, updates all listener sound positions.
+/datum/looping_sound/proc/parent_moved(datum/source, ...)
+	SIGNAL_HANDLER
+	update_all()
