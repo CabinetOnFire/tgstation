@@ -8,6 +8,7 @@
 			"vars": {
 				"target_key": "BB_CURRENT_TARGET",
 				"targeting_strategy": "BB_TARGETING_STRATEGY",
+				"vision_range": 12,
 				"hiding_location_key": "BB_CURRENT_TARGET_HIDING_LOCATION"
 			}
 		},
