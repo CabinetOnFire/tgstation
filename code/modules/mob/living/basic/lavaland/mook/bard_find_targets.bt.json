@@ -52,6 +52,12 @@
 				"targeting_strategy": "/datum/targeting_strategy/conscious_human",
 				"time_between_perform": "1 SECONDS"
 			}
+		},
+		{
+			"type": "subplan",
+			"success_policy": "BT_SUBPLAN_SUCCEED_ON_SUCCESS",
+			"failure_policy": "BT_SUBPLAN_FAIL_ON_FAILURE",
+			"children": []
 		}
 	]
 }
