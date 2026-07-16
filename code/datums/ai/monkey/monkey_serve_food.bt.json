@@ -20,7 +20,7 @@
 					"type": "leaf",
 					"behavior": "/datum/bt_node/ai_behavior/monkey_find_patrons",
 					"vars": {
-						"patrons_key": "BB_monkey_patrons_nearby",
+						"patrons_key": "STINKY_APES_STINK",
 						"give_target_key": "BB_monkey_current_give_target"
 					}
 				}
