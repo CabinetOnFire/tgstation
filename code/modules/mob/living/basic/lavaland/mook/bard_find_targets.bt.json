@@ -8,6 +8,7 @@
 			"vars": {
 				"target_key": "BB_CURRENT_TARGET",
 				"targeting_strategy": "BB_TARGETING_STRATEGY",
+				"vision_range": 12,
 				"hiding_location_key": "BB_CURRENT_TARGET_HIDING_LOCATION"
 			}
 		},
@@ -51,6 +52,12 @@
 				"targeting_strategy": "/datum/targeting_strategy/conscious_human",
 				"time_between_perform": "1 SECONDS"
 			}
+		},
+		{
+			"type": "subplan",
+			"success_policy": "BT_SUBPLAN_SUCCEED_ON_SUCCESS",
+			"failure_policy": "BT_SUBPLAN_FAIL_ON_FAILURE",
+			"children": []
 		}
 	]
 }

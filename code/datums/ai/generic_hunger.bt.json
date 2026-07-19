@@ -24,7 +24,7 @@
 						"behavior": "/datum/bt_node/ai_behavior/move_to_target",
 						"vars": {
 							"target_key": "bb_food_target",
-							"required_dist": 1,
+							"required_dist": 2,
 							"finish_on_arrival": true
 						}
 					},
