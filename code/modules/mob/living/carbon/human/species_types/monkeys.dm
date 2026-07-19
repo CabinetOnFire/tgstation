@@ -149,6 +149,7 @@
 	primate.AddElement(/datum/element/human_biter)
 
 
+
 /obj/item/organ/brain/primate/on_mob_remove(mob/living/carbon/primate)
 	. = ..()
 	UnregisterSignal(primate, COMSIG_LIVING_MOB_BUMPED)
