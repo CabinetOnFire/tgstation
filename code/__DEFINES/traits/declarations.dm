@@ -84,8 +84,6 @@ Remember to update _globalvars/traits.dm if you're adding/removing/renaming trai
 ///Recolored by item/greentext
 #define TRAIT_GREENTEXT_CURSED "greentext_curse"
 #define TRAIT_INCAPACITATED "incapacitated"
-/// In some kind of critical condition. Is able to succumb.
-#define TRAIT_CRITICAL_CONDITION "critical-condition"
 /// Whitelist for mobs that can read or write
 #define TRAIT_LITERATE "literate"
 /// Blacklist for mobs that can't read or write
@@ -93,7 +91,7 @@ Remember to update _globalvars/traits.dm if you're adding/removing/renaming trai
 /// Mute. Can't talk.
 #define TRAIT_MUTE "mute"
 /// Softspoken. Always whisper.
-#define TRAIT_SOFTSPOKEN "softspoken"
+#define TRAIT_FORCE_WHISPER "softspoken"
 /// Gibs on death and slips like ice.
 #define TRAIT_CURSED "cursed"
 /// Emotemute. Can't... emote.
@@ -406,15 +404,13 @@ Remember to update _globalvars/traits.dm if you're adding/removing/renaming trai
 #define TRAIT_MESON_VISION "meson_vision"
 /// Gives us Night vision
 #define TRAIT_TRUE_NIGHT_VISION "true_night_vision"
-/// Gives us minor night vision
-#define TRAIT_MINOR_NIGHT_VISION "minor_night_vision"
 /// Negates our gravity, letting us move normally on floors in 0-g
 #define TRAIT_NEGATES_GRAVITY "negates_gravity"
 /// We are ignoring gravity
 #define TRAIT_IGNORING_GRAVITY "ignores_gravity"
 /// We have some form of forced gravity acting on us
 #define TRAIT_FORCED_GRAVITY "forced_gravity"
-/// Makes whispers clearly heard from seven tiles away, the full hearing range
+/// Allows the mob to hear whispers as if it were normal speech
 #define TRAIT_GOOD_HEARING "good_hearing"
 /// Allows you to hear speech through walls
 #define TRAIT_XRAY_HEARING "xray_hearing"
@@ -458,6 +454,8 @@ Remember to update _globalvars/traits.dm if you're adding/removing/renaming trai
 #define TRAIT_ABDUCTOR_HUD "abductor_hud"
 /// Stop the user from seeing the sechud. Only works for trait handled sechuds.
 #define TRAIT_BLOCK_SECHUD "block_sechud"
+/// Stop the user from seeing the medhud. Only works for trait handled medhuds.
+#define TRAIT_BLOCK_MEDHUD "block_medhud"
 /// for something granting you a diagnostic hud
 #define TRAIT_DIAGNOSTIC_HUD "diag_hud"
 #define TRAIT_BOT_PATH_HUD "bot_path_hud"
@@ -1686,5 +1684,8 @@ Remember to update _globalvars/traits.dm if you're adding/removing/renaming trai
 
 /// Mobs with this trait will always have be a priority target for mining mobs
 #define TRAIT_MINING_AGGRO "mining_aggro"
+
+/// Turfs with this trait allow whispers to be projected over it when the whisperer is facing it
+#define TRAIT_TURF_PROJECTS_WHISPERS  "turf_projects_whispers"
 
 // END TRAIT DEFINES
