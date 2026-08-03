@@ -6,6 +6,8 @@
 	icon_state = "bcircuit"
 	base_icon_state = "bcircuit"
 	light_color = LIGHT_COLOR_BABY_BLUE
+	light_range = 2
+	light_power = 1.5
 	floor_tile = /obj/item/stack/tile/circuit
 	rust_resistance = RUST_RESISTANCE_REINFORCED
 	/// If we want to ignore our area's power status and just be always off
@@ -38,7 +40,7 @@
 		return
 
 	set_light_color(LAZYLEN(SSmapping.nuke_threats) ? LIGHT_COLOR_INTENSE_RED : initial(light_color))
-	set_light(2, 1.5)
+	set_light(initial(light_range), initial(light_power))
 
 /turf/open/floor/circuit/update_icon_state()
 	icon_state = on ? (LAZYLEN(SSmapping.nuke_threats) ? "rcircuitanim" : initial(icon_state)) : "[base_icon_state]off"
