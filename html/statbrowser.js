@@ -22,6 +22,28 @@ var current_tab = null;
 //mc_tab_parts expects a list to be returned, to which we'll send a list within a list
 //with just "loading" to not appear broken.
 var mc_tab_parts = [['Loading...']];
+var mc_tick_summary = {};
+var mc_subsystems = [];
+var mc_sort_mode = 'priority';
+var mc_sort_descending = true;
+var mc_hide_inactive = false;
+var mc_name_query = '';
+var mc_dashboard = null;
+var mc_summary_usage = null;
+var mc_summary_limit = null;
+var mc_summary_internal = null;
+var mc_summary_location = null;
+var mc_summary_subsystem_usage = null;
+var mc_summary_usage_window = null;
+var mc_rolling_bar = null;
+var mc_rolling_legend = null;
+var mc_subsystem_count = null;
+var mc_subsystem_list = null;
+var mc_sort_select = null;
+var mc_sort_direction = null;
+var mc_inactive_button = null;
+var mc_search_input = null;
+var mc_expanded_details = {};
 var href_token = null;
 var verb_tabs = [];
 var verbs = [['', '']]; // list with a list inside
@@ -407,33 +429,567 @@ function draw_status() {
 }
 
 function draw_mc() {
-  statcontentdiv.textContent = '';
-  statcontentdiv.className = 'mcstatcontent';
-  var table = document.createElement('table');
+  statcontentdiv.className = "mcstatcontent";
+  if (!mc_dashboard || !statcontentdiv.contains(mc_dashboard)) {
+    statcontentdiv.textContent = "";
+    mc_dashboard = document.createElement("div");
+    mc_dashboard.className = "mc-dashboard";
+
+    var heading = document.createElement("div");
+    heading.className = "mc-heading";
+    var title = document.createElement("strong");
+    title.textContent = "MC / Subsystems";
+    mc_summary_location = document.createElement("span");
+    mc_summary_location.className = "mc-location";
+    heading.appendChild(title);
+    heading.appendChild(mc_summary_location);
+    mc_dashboard.appendChild(heading);
+
+    var overview = document.createElement("div");
+    overview.className = "mc-overview";
+    var usageCard = document.createElement("div");
+    usageCard.className = "mc-usage-card";
+    var usageTitle = document.createElement("div");
+    usageTitle.className = "mc-card-title";
+    usageTitle.textContent = "Current tick usage";
+    mc_summary_usage = document.createElement("strong");
+    mc_summary_usage.className = "mc-usage-value";
+    mc_summary_limit = document.createElement("span");
+    mc_summary_limit.className = "mc-limit-value";
+    var gauge = document.createElement("div");
+    gauge.className = "mc-gauge";
+    gauge.setAttribute("role", "img");
+    gauge.setAttribute(
+      "aria-label",
+      "Current tick usage, MC threshold, and normal running limit",
+    );
+    var gaugeTrack = document.createElement("div");
+    gaugeTrack.className = "mc-gauge-track";
+    var gaugeFill = document.createElement("div");
+    gaugeFill.className = "mc-gauge-fill";
+    gaugeFill.id = "mc-gauge-fill";
+    var mcMarker = document.createElement("div");
+    mcMarker.className = "mc-gauge-marker mc-gauge-mc-marker";
+    mcMarker.title = "MC queue scheduling threshold";
+    var limitMarker = document.createElement("div");
+    limitMarker.className = "mc-gauge-marker mc-gauge-limit-marker";
+    limitMarker.title = "Normal running limit";
+    gaugeTrack.appendChild(gaugeFill);
+    gaugeTrack.appendChild(mcMarker);
+    gaugeTrack.appendChild(limitMarker);
+    gauge.appendChild(gaugeTrack);
+    var gaugeLegend = document.createElement("div");
+    gaugeLegend.className = "mc-gauge-legend";
+    gaugeLegend.textContent = "MC threshold 70% | normal running limit";
+    var internals = document.createElement("div");
+    internals.className = "mc-internal-usage";
+    internals.appendChild(
+      document.createTextNode("BYOND internal usage (previous tick): "),
+    );
+    mc_summary_internal = document.createElement("strong");
+    internals.appendChild(mc_summary_internal);
+    usageCard.appendChild(usageTitle);
+    usageCard.appendChild(mc_summary_usage);
+    usageCard.appendChild(gauge);
+    usageCard.appendChild(mc_summary_limit);
+    usageCard.appendChild(gaugeLegend);
+    usageCard.appendChild(internals);
+    overview.appendChild(usageCard);
+
+    var rollingCard = document.createElement("div");
+    rollingCard.className = "mc-rolling-card";
+    var rollingTitle = document.createElement("div");
+    rollingTitle.className = "mc-card-title";
+    rollingTitle.textContent = "Subsystem usage per tick";
+    mc_summary_subsystem_usage = document.createElement("strong");
+    mc_summary_subsystem_usage.className =
+      "mc-summary-subsystem-usage mc-usage-value";
+    mc_summary_usage_window = document.createElement("span");
+    mc_summary_usage_window.className = "mc-limit-value";
+    mc_rolling_bar = document.createElement("div");
+    mc_rolling_bar.className = "mc-stacked-bar";
+    mc_rolling_bar.setAttribute("role", "img");
+    mc_rolling_bar.setAttribute(
+      "aria-label",
+      "Subsystem contributions to tick usage over a rolling window",
+    );
+    mc_rolling_legend = document.createElement("div");
+    mc_rolling_legend.className = "mc-rolling-legend";
+    rollingCard.appendChild(rollingTitle);
+    rollingCard.appendChild(mc_summary_subsystem_usage);
+    rollingCard.appendChild(mc_summary_usage_window);
+    rollingCard.appendChild(mc_rolling_bar);
+    rollingCard.appendChild(mc_rolling_legend);
+    overview.appendChild(rollingCard);
+    mc_dashboard.appendChild(overview);
+
+    var controllerDetails = document.createElement("details");
+    controllerDetails.className = "mc-controller-details";
+    var detailsSummary = document.createElement("summary");
+    detailsSummary.textContent = "Controller and world details";
+    controllerDetails.appendChild(detailsSummary);
+    var detailsTable = document.createElement("table");
+    detailsTable.className = "mc-details-table";
+    controllerDetails.appendChild(detailsTable);
+    mc_dashboard.appendChild(controllerDetails);
+
+    var toolbar = document.createElement("div");
+    toolbar.className = "mc-toolbar";
+    var listTitle = document.createElement("strong");
+    listTitle.textContent = "Subsystems";
+    mc_subsystem_count = document.createElement("span");
+    mc_subsystem_count.className = "mc-subsystem-count";
+    var searchLabel = document.createElement("label");
+    searchLabel.className = "mc-search-label";
+    searchLabel.textContent = "Search";
+    mc_search_input = document.createElement("input");
+    mc_search_input.type = "search";
+    mc_search_input.className = "mc-search";
+    mc_search_input.placeholder = "Subsystem name";
+    mc_search_input.value = mc_name_query;
+    mc_search_input.oninput = function () {
+      mc_name_query = mc_search_input.value;
+      render_mc_subsystems();
+    };
+    searchLabel.appendChild(mc_search_input);
+    mc_sort_select = document.createElement("select");
+    mc_sort_select.className = "mc-sort-select";
+    var sortModes = [
+      ["priority", "Run order / priority"],
+      ["usage_per_tick", "Usage per tick"],
+      ["usage", "Usage per run"],
+      ["allocation", "Allowance per slice"],
+      ["cost", "Cost per fire"],
+      ["name", "Name"],
+    ];
+    for (var sortIndex = 0; sortIndex < sortModes.length; sortIndex++) {
+      var sortOption = document.createElement("option");
+      sortOption.value = sortModes[sortIndex][0];
+      sortOption.textContent = sortModes[sortIndex][1];
+      mc_sort_select.appendChild(sortOption);
+    }
+    mc_sort_select.value = mc_sort_mode;
+    mc_sort_select.onchange = function () {
+      mc_sort_mode = mc_sort_select.value;
+      mc_sort_descending = mc_sort_mode !== "name";
+      render_mc_subsystems();
+    };
+    mc_sort_direction = document.createElement("button");
+    mc_sort_direction.className = "mc-control-button";
+    mc_sort_direction.onclick = function () {
+      mc_sort_descending = !mc_sort_descending;
+      render_mc_subsystems();
+    };
+    mc_inactive_button = document.createElement("button");
+    mc_inactive_button.className = "mc-control-button";
+    mc_inactive_button.onclick = function () {
+      mc_hide_inactive = !mc_hide_inactive;
+      render_mc_subsystems();
+    };
+    toolbar.appendChild(listTitle);
+    toolbar.appendChild(mc_subsystem_count);
+    toolbar.appendChild(searchLabel);
+    toolbar.appendChild(mc_sort_select);
+    toolbar.appendChild(mc_sort_direction);
+    toolbar.appendChild(mc_inactive_button);
+    mc_dashboard.appendChild(toolbar);
+
+    var columns = document.createElement("div");
+    columns.className = "mc-list-columns";
+    columns.innerHTML =
+      "<span>Subsystem</span><span>Priority</span><span>Avg allowance / slice</span><span>Usage / run</span><span>Usage / tick</span><span>Cost</span><span></span>";
+    mc_dashboard.appendChild(columns);
+    mc_subsystem_list = document.createElement("div");
+    mc_subsystem_list.className = "mc-subsystem-list";
+    mc_dashboard.appendChild(mc_subsystem_list);
+    statcontentdiv.appendChild(mc_dashboard);
+  }
+
+  render_mc_summary();
+  render_mc_rolling_summary();
+  render_mc_details();
+  render_mc_subsystems();
+}
+
+function mc_number(value, digits) {
+  var number = Number(value);
+  if (!isFinite(number)) number = 0;
+  return number.toFixed(digits);
+}
+
+function mc_clamp_percent(value) {
+  return Math.max(0, Math.min(100, Number(value) || 0));
+}
+
+function render_mc_summary() {
+  mc_summary_location.textContent =
+    "Location: " + (mc_tick_summary.coord_entry || "Unknown");
+  var usage = Number(mc_tick_summary.tick_usage) || 0;
+  var runningLimit = Number(mc_tick_summary.running_limit) || 0;
+  var mcLimit = Number(mc_tick_summary.mc_limit) || 70;
+  var fill = document.getElementById("mc-gauge-fill");
+  mc_summary_usage.textContent = mc_number(usage, 1) + "%";
+  mc_summary_limit.textContent =
+    "Normal running limit: " + mc_number(runningLimit, 1) + "%";
+  mc_summary_internal.textContent = mc_number(mc_tick_summary.map_cpu, 1) + "%";
+  fill.style.width = mc_clamp_percent(usage) + "%";
+  fill.className =
+    "mc-gauge-fill" +
+    (usage >= runningLimit
+      ? " mc-gauge-over-limit"
+      : usage >= mcLimit
+        ? " mc-gauge-near-limit"
+        : "");
+  var markers = mc_dashboard.querySelectorAll(".mc-gauge-marker");
+  markers[0].style.left = mc_clamp_percent(mcLimit) + "%";
+  markers[0].title =
+    "MC queue scheduling threshold: " + mc_number(mcLimit, 1) + "%";
+  markers[1].style.left = mc_clamp_percent(runningLimit) + "%";
+  markers[1].title =
+    "Normal running limit: " + mc_number(runningLimit, 1) + "%";
+}
+
+function render_mc_rolling_summary() {
+  var total = Number(mc_tick_summary.subsystem_usage_per_tick) || 0;
+  var windowSeconds = Number(mc_tick_summary.usage_window_seconds) || 0;
+  mc_summary_subsystem_usage.textContent = mc_number(total, 1) + "% / tick";
+  mc_summary_usage_window.textContent =
+    mc_number(windowSeconds, 1) + "s rolling window";
+  mc_rolling_bar.textContent = "";
+  mc_rolling_legend.textContent = "";
+  mc_rolling_bar.className =
+    "mc-stacked-bar" + (total > 100 ? " mc-stacked-bar-over-cap" : "");
+  mc_rolling_bar.setAttribute(
+    "aria-label",
+    "Subsystems use " + mc_number(total, 1) + "% of a tick on average over " +
+      mc_number(windowSeconds, 1) + " seconds",
+  );
+
+  var consumers = mc_subsystems
+    .filter(function (subsystem) {
+      return Number(subsystem.usage_per_tick) > 0;
+    })
+    .sort(function (a, b) {
+      return Number(b.usage_per_tick) - Number(a.usage_per_tick);
+    });
+  var shownUsage = 0;
+  var topCount = Math.min(5, consumers.length);
+  for (var i = 0; i < topCount; i++) {
+    var subsystem = consumers[i];
+    var value = Number(subsystem.usage_per_tick) || 0;
+    shownUsage += value;
+    append_mc_rolling_segment(
+      subsystem.name,
+      value,
+      "mc-segment-" + (i % 5),
+    );
+  }
+  var otherSubsystemUsage = Math.max(0, total - shownUsage);
+  if (otherSubsystemUsage > 0.01) {
+    append_mc_rolling_segment(
+      "Other subsystems",
+      otherSubsystemUsage,
+      "mc-segment-other",
+    );
+  }
+  var unaccounted = Math.max(0, 100 - total);
+  if (unaccounted > 0.01) {
+    append_mc_rolling_segment(
+      "Other tick use / idle",
+      unaccounted,
+      "mc-segment-unaccounted",
+    );
+  }
+  if (!mc_tick_summary.usage_collection_active) {
+    var inactive = document.createElement("span");
+    inactive.className = "mc-rolling-status";
+    inactive.textContent = "Rolling collection is inactive";
+    mc_rolling_legend.appendChild(inactive);
+  }
+}
+
+function append_mc_rolling_segment(label, value, colorClass) {
+  var segment = document.createElement("div");
+  segment.className = "mc-stacked-segment " + colorClass;
+  segment.style.width = mc_clamp_percent(value) + "%";
+  segment.title = label + ": " + mc_number(value, 2) + "% per tick";
+  mc_rolling_bar.appendChild(segment);
+
+  var legendItem = document.createElement("span");
+  legendItem.className = "mc-legend-item";
+  legendItem.title = segment.title;
+  var swatch = document.createElement("span");
+  swatch.className = "mc-legend-swatch " + colorClass;
+  var legendText = document.createElement("span");
+  legendText.textContent = label + " " + mc_number(value, 1) + "%";
+  legendItem.appendChild(swatch);
+  legendItem.appendChild(legendText);
+  mc_rolling_legend.appendChild(legendItem);
+}
+
+function render_mc_details() {
+  var table = mc_dashboard.querySelector(".mc-details-table");
+  table.textContent = "";
   for (var i = 0; i < mc_tab_parts.length; i++) {
     var part = mc_tab_parts[i];
-    var tr = document.createElement('tr');
-    var td0 = document.createElement('td');
-    td0.className = 'monospace';
-    td0.textContent = part[0];
-    var td1 = document.createElement('td');
-    td1.textContent = part[1];
-    var td2 = document.createElement('td');
+    var row = document.createElement("tr");
+    var label = document.createElement("th");
+    label.textContent = part[1] || "";
+    var value = document.createElement("td");
     if (part[3]) {
-      var a = document.createElement('a');
-      a.href =
-        'byond://?_src_=vars;admin_token=' + href_token + ';Vars=' + part[3];
-      a.textContent = part[2];
-      td2.appendChild(a);
+      var link = document.createElement("a");
+      link.href =
+        "byond://?_src_=vars;admin_token=" + href_token + ";Vars=" + part[3];
+      link.textContent = part[2];
+      value.appendChild(link);
     } else {
-      td2.textContent = part[2];
+      value.textContent = part[2] || "";
     }
-    tr.appendChild(td0);
-    tr.appendChild(td1);
-    tr.appendChild(td2);
-    table.appendChild(tr);
+    row.appendChild(label);
+    row.appendChild(value);
+    table.appendChild(row);
   }
-  document.getElementById('statcontent').appendChild(table);
+}
+
+function mc_scheduler_group(subsystem) {
+  if (mc_is_inactive(subsystem)) return 3;
+  if (subsystem.background) return 2;
+  if (subsystem.ticker) return 0;
+  return 1;
+}
+
+function mc_is_inactive(subsystem) {
+  return !subsystem.initialized || subsystem.doesnt_fire || !subsystem.can_fire;
+}
+
+function render_mc_subsystems() {
+  if (!mc_subsystem_list) return;
+  var query = mc_name_query.toLowerCase();
+  var filtered = mc_subsystems.filter(function (subsystem) {
+    return (
+      (!mc_hide_inactive || !mc_is_inactive(subsystem)) &&
+      (!query || subsystem.name.toLowerCase().indexOf(query) !== -1)
+    );
+  });
+  filtered.sort(function (a, b) {
+    var result = 0;
+    if (mc_sort_mode === "priority") {
+      result = mc_scheduler_group(a) - mc_scheduler_group(b);
+      if (!result) result = Number(b.priority) - Number(a.priority);
+      if (
+        !result &&
+        mc_sort_descending === false &&
+        mc_scheduler_group(a) === mc_scheduler_group(b)
+      ) {
+        result = Number(a.priority) - Number(b.priority);
+      }
+    } else if (mc_sort_mode !== "name") {
+      result = Number(a[mc_sort_mode]) - Number(b[mc_sort_mode]);
+      if (mc_sort_descending) result *= -1;
+      if (!result) result = mc_scheduler_group(a) - mc_scheduler_group(b);
+      if (!result) result = Number(b.priority) - Number(a.priority);
+    }
+    if (result && mc_sort_mode === "priority") return result;
+    if (mc_sort_mode === "name") {
+      result =
+        a.name.toLowerCase() < b.name.toLowerCase()
+          ? -1
+          : a.name.toLowerCase() > b.name.toLowerCase()
+            ? 1
+            : 0;
+      if (mc_sort_descending) result *= -1;
+    }
+    if (!result && mc_sort_mode !== "name") {
+      result =
+        a.name.toLowerCase() < b.name.toLowerCase()
+          ? -1
+          : a.name.toLowerCase() > b.name.toLowerCase()
+            ? 1
+            : 0;
+    }
+    return result;
+  });
+  mc_subsystem_count.textContent =
+    "(" + filtered.length + " / " + mc_subsystems.length + ")";
+  mc_sort_direction.textContent = mc_sort_descending
+    ? "Descending"
+    : "Ascending";
+  mc_sort_direction.setAttribute("aria-label", mc_sort_direction.textContent);
+  mc_inactive_button.textContent = mc_hide_inactive
+    ? "Show inactive"
+    : "Hide inactive";
+  mc_inactive_button.className =
+    "mc-control-button" + (mc_hide_inactive ? " selected" : "");
+
+  mc_subsystem_list.textContent = "";
+  for (var i = 0; i < filtered.length; i++) {
+    mc_subsystem_list.appendChild(create_mc_subsystem_row(filtered[i]));
+  }
+}
+
+function create_mc_bar(label, value, unit) {
+  var field = document.createElement("div");
+  field.className = "mc-row-field";
+  var head = document.createElement("div");
+  head.className = "mc-row-field-head";
+  var fieldLabel = document.createElement("span");
+  fieldLabel.className = "mc-mobile-label";
+  fieldLabel.textContent = label;
+  var number = Number(value) || 0;
+  var fieldValue = document.createElement("strong");
+  fieldValue.textContent = mc_number(number, 2) + unit;
+  head.appendChild(fieldLabel);
+  head.appendChild(fieldValue);
+  var track = document.createElement("div");
+  track.className = "mc-row-bar";
+  var fill = document.createElement("div");
+  fill.className =
+    "mc-row-bar-fill" +
+    (number >= 25
+      ? " mc-row-bar-high"
+      : number >= 10
+        ? " mc-row-bar-medium"
+        : "");
+  fill.style.width = mc_clamp_percent(number) + "%";
+  track.appendChild(fill);
+  field.appendChild(head);
+  field.appendChild(track);
+  return field;
+}
+
+function create_mc_subsystem_row(subsystem) {
+  var row = document.createElement("div");
+  row.className = "mc-row";
+  var stateName = subsystem.state || " ";
+  var stateLabel =
+    stateName === "R"
+      ? "Running"
+      : stateName === "Q"
+        ? "Queued"
+        : stateName === "P"
+          ? "Paused"
+          : stateName === "S"
+            ? "Sleeping"
+            : "Idle";
+  var stateClass = "mc-state-idle";
+  if (!subsystem.initialized) {
+    stateLabel = "Not initialized";
+    stateClass = "mc-state-offline";
+  } else if (subsystem.doesnt_fire) {
+    stateLabel = "Does not fire";
+    stateClass = "mc-state-offline";
+  } else if (!subsystem.can_fire) {
+    stateLabel = "Disabled";
+    stateClass = "mc-state-offline";
+  } else if (stateName === "R") {
+    stateClass = "mc-state-running";
+  } else if (stateName === "Q" || stateName === "P") {
+    stateClass = "mc-state-queued";
+  }
+
+  var name = document.createElement("div");
+  name.className = "mc-row-name";
+  var state = document.createElement("span");
+  state.className = "mc-state " + stateClass;
+  state.textContent = stateName.trim() || "-";
+  state.title = stateLabel;
+  var nameText = document.createElement("strong");
+  nameText.textContent = subsystem.name;
+  var group = document.createElement("span");
+  group.className = "mc-group-badge";
+  group.textContent = subsystem.background
+    ? "BACKGROUND"
+    : subsystem.ticker
+      ? "TICKER"
+      : "REGULAR";
+  name.appendChild(state);
+  name.appendChild(nameText);
+  name.appendChild(group);
+
+  var priority = document.createElement("div");
+  priority.className = "mc-row-priority";
+  var priorityLabel = document.createElement("span");
+  priorityLabel.className = "mc-mobile-label";
+  priorityLabel.textContent = "Priority";
+  var priorityValue = document.createElement("strong");
+  priorityValue.textContent = subsystem.priority;
+  priority.appendChild(priorityLabel);
+  priority.appendChild(priorityValue);
+
+  var allocation = create_mc_bar(
+    "Allowance / slice",
+    subsystem.allocation,
+    "%",
+  );
+  allocation.className += " mc-allocation-field";
+  allocation.title =
+    "Average tick budget granted at the start of each execution slice, including resumed slices";
+  var usage = create_mc_bar("Usage / run", subsystem.usage, "%");
+  usage.className += " mc-usage-field";
+  usage.title =
+    "Average tick usage for a completed subsystem run, including resumed slices";
+  var usagePerTick = create_mc_bar(
+    "Usage / tick",
+    subsystem.usage_per_tick,
+    "%",
+  );
+  usagePerTick.className += " mc-usage-per-tick-field";
+  usagePerTick.title = "Average tick usage per world tick over the rolling window";
+
+  var cost = document.createElement("div");
+  cost.className = "mc-row-cost";
+  var costLabel = document.createElement("span");
+  costLabel.className = "mc-mobile-label";
+  costLabel.textContent = "Cost";
+  var costValue = document.createElement("strong");
+  costValue.textContent = mc_number(subsystem.cost, 2) + " ms";
+  cost.appendChild(costLabel);
+  cost.appendChild(costValue);
+
+  var actions = document.createElement("div");
+  actions.className = "mc-row-actions";
+  if (subsystem.ref && href_token) {
+    var vv = document.createElement("a");
+    vv.className = "mc-vv-button";
+    vv.href =
+      "byond://?_src_=vars;admin_token=" +
+      href_token +
+      ";Vars=" +
+      subsystem.ref;
+    vv.textContent = "VV";
+    vv.title = "View Variables";
+    vv.setAttribute("aria-label", "View Variables for " + subsystem.name);
+    actions.appendChild(vv);
+  }
+
+  var details = document.createElement("details");
+  details.className = "mc-row-details";
+  details.open = !!mc_expanded_details[subsystem.name];
+  details.ontoggle = function () {
+    mc_expanded_details[subsystem.name] = details.open;
+  };
+  var detailSummary = document.createElement("summary");
+  detailSummary.textContent = "Details";
+  var detailText = document.createElement("span");
+  detailText.textContent = subsystem.stat_entry || "";
+  details.appendChild(detailSummary);
+  details.appendChild(detailText);
+  if (Number(subsystem.overrun) > 0) {
+    var overrun = document.createElement("span");
+    overrun.className = "mc-overrun";
+    overrun.textContent = "Overrun: " + mc_number(subsystem.overrun, 2) + "%";
+    details.appendChild(overrun);
+  }
+
+  row.appendChild(name);
+  row.appendChild(priority);
+  row.appendChild(allocation);
+  row.appendChild(usage);
+  row.appendChild(usagePerTick);
+  row.appendChild(cost);
+  row.appendChild(actions);
+  row.appendChild(details);
+  return row;
 }
 
 function remove_tickets() {
@@ -768,7 +1324,29 @@ function set_tabs_style(style) {
   }
 }
 
-function restoreFocus() {
+function is_statpanel_control(target) {
+  while (target && target !== document) {
+    if (
+      target.tagName === "INPUT" ||
+      target.tagName === "SELECT" ||
+      target.tagName === "OPTION" ||
+      target.tagName === "TEXTAREA" ||
+      target.tagName === "BUTTON"
+    ) {
+      return true;
+    }
+    target = target.parentElement;
+  }
+  return false;
+}
+
+function restoreFocus(event) {
+  if (
+    (event && is_statpanel_control(event.target)) ||
+    is_statpanel_control(document.activeElement)
+  ) {
+    return;
+  }
   run_after_focus(() => {
     Byond.winset('map', {
       focus: true,
@@ -883,17 +1461,19 @@ Byond.subscribeTo('update_stat', (payload) => {
   }
 });
 
-Byond.subscribeTo('update_mc', (payload) => {
+Byond.subscribeTo("update_mc", (payload) => {
   mc_tab_parts = payload.mc_data;
-  mc_tab_parts.splice(0, 0, ['', 'Location:', payload.coord_entry]);
+  mc_tick_summary = payload.tick_summary || {};
+  mc_tick_summary.coord_entry = payload.coord_entry;
+  mc_subsystems = payload.subsystems || [];
 
-  if (!verb_tabs.includes('MC')) {
-    verb_tabs.push('MC');
+  if (!verb_tabs.includes("MC")) {
+    verb_tabs.push("MC");
   }
 
-  createStatusTab('MC');
+  createStatusTab("MC");
 
-  if (current_tab == 'MC') {
+  if (current_tab == "MC") {
     draw_mc();
   }
 });

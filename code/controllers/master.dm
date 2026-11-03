@@ -78,6 +78,10 @@ GLOBAL_REAL(Master, /datum/controller/master)
 	var/overview_fast_update = FALSE
 	/// Enables rolling usage averaging
 	var/use_rolling_usage = FALSE
+	/// Rolling usage is needed by the Controller Overview window.
+	var/overview_rolling_usage_active = FALSE
+	/// Rolling usage is needed by an admin viewing the MC stat panel.
+	var/statpanel_rolling_usage_active = FALSE
 	/// How long to run our rolling usage averaging
 	var/rolling_usage_length = 5 SECONDS
 
@@ -156,7 +160,8 @@ ADMIN_VERB(cmd_controller_view_ui, R_SERVER|R_DEBUG, "Controller Overview", "Vie
 	if(isnull(ui))
 		ui = new /datum/tgui(user, src, "ControllerOverview")
 		ui.open()
-		use_rolling_usage = TRUE
+		overview_rolling_usage_active = TRUE
+		update_rolling_usage()
 
 /datum/controller/master/ui_close(mob/user)
 	var/valid_found = FALSE
@@ -164,9 +169,12 @@ ADMIN_VERB(cmd_controller_view_ui, R_SERVER|R_DEBUG, "Controller Overview", "Vie
 		if(open_ui.user == user)
 			continue
 		valid_found = TRUE
-	if(!valid_found)
-		use_rolling_usage = FALSE
+	overview_rolling_usage_active = valid_found
+	update_rolling_usage()
 	return ..()
+
+/datum/controller/master/proc/update_rolling_usage()
+	use_rolling_usage = overview_rolling_usage_active || statpanel_rolling_usage_active
 
 /datum/controller/master/ui_data(mob/user)
 	var/list/data = list()

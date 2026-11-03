@@ -7,6 +7,8 @@ SUBSYSTEM_DEF(statpanels)
 	var/list/currentrun = list()
 	var/list/global_data
 	var/list/mc_data
+	var/list/mc_subsystem_data
+	var/mc_subsystem_usage_per_tick = 0
 
 	///how many subsystem fires between most tab updates
 	var/default_wait = 10
@@ -48,7 +50,9 @@ SUBSYSTEM_DEF(statpanels)
 				global_data += "[ETA] [SSshuttle.emergency.getTimerStr()]"
 
 		src.currentrun = GLOB.clients.Copy()
+		update_usage_collection()
 		mc_data = null
+		mc_subsystem_data = null
 
 	var/list/currentrun = src.currentrun
 	while(length(currentrun))
@@ -104,9 +108,35 @@ SUBSYSTEM_DEF(statpanels)
 /datum/controller/subsystem/statpanels/proc/set_MC_tab(client/target)
 	var/turf/eye_turf = get_turf(target.eye)
 	var/coord_entry = COORD(eye_turf)
+	if(!Master.statpanel_rolling_usage_active)
+		Master.statpanel_rolling_usage_active = TRUE
+		Master.update_rolling_usage()
 	if(!mc_data)
 		generate_mc_data()
-	target.stat_panel.send_message("update_mc", list("mc_data" = mc_data, "coord_entry" = coord_entry))
+	var/list/tick_summary = list(
+		"tick_usage" = TICK_USAGE,
+		"running_limit" = TICK_LIMIT_RUNNING,
+		"mc_limit" = TICK_LIMIT_MC,
+		"map_cpu" = MAPTICK_LAST_INTERNAL_TICK_USAGE,
+		"subsystem_usage_per_tick" = mc_subsystem_usage_per_tick,
+		"usage_window_seconds" = Master.rolling_usage_length / 10,
+		"usage_collection_active" = Master.use_rolling_usage,
+	)
+	target.stat_panel.send_message("update_mc", list(
+		"mc_data" = mc_data,
+		"coord_entry" = coord_entry,
+		"tick_summary" = tick_summary,
+		"subsystems" = mc_subsystem_data,
+	))
+
+/datum/controller/subsystem/statpanels/proc/update_usage_collection()
+	var/has_mc_admin = FALSE
+	for(var/client/admin_client as anything in GLOB.clients)
+		if(admin_client.holder && admin_client.stat_tab == "MC")
+			has_mc_admin = TRUE
+			break
+	Master.statpanel_rolling_usage_active = has_mc_admin
+	Master.update_rolling_usage()
 
 /datum/controller/subsystem/statpanels/proc/set_tickets_tab(client/target)
 	var/list/ahelp_tickets = GLOB.ahelp_tickets.stat_entry()
@@ -180,8 +210,34 @@ SUBSYSTEM_DEF(statpanels)
 	else
 		mc_data.Insert(2, list(list("", "byond-tracy:", "[tracy_dll] not present")))
 #endif
+	mc_subsystem_data = list()
+	mc_subsystem_usage_per_tick = 0
+	var/rolling_usage_denominator = max(1, DS2TICKS(Master.rolling_usage_length))
 	for(var/datum/controller/subsystem/sub_system as anything in Master.subsystems)
-		mc_data[++mc_data.len] = list("\[[sub_system.state_letter()]]", sub_system.name, sub_system.stat_entry(), text_ref(sub_system))
+		var/list/rolling_usage = sub_system.rolling_usage
+		sub_system.prune_rolling_usage()
+		var/rolling_usage_sum = 0
+		for(var/i in 2 to length(rolling_usage) step 2)
+			rolling_usage_sum += rolling_usage[i]
+		var/usage_per_tick = rolling_usage_sum / rolling_usage_denominator
+		mc_subsystem_usage_per_tick += usage_per_tick
+		mc_subsystem_data += list(list(
+			"name" = sub_system.name,
+			"ref" = text_ref(sub_system),
+			"state" = sub_system.state_letter(),
+			"initialized" = sub_system.initialized,
+			"can_fire" = sub_system.can_fire,
+			"doesnt_fire" = !!(sub_system.ss_flags & SS_NO_FIRE),
+			"ticker" = !!(sub_system.ss_flags & SS_TICKER),
+			"background" = !!(sub_system.ss_flags & SS_BACKGROUND),
+			"priority" = sub_system.priority,
+			"allocation" = sub_system.tick_allocation_avg,
+			"usage" = sub_system.tick_usage,
+			"usage_per_tick" = usage_per_tick,
+			"cost" = sub_system.cost,
+			"overrun" = sub_system.tick_overrun,
+			"stat_entry" = sub_system.stat_entry(),
+		))
 
 ///immediately update the active statpanel tab of the target client
 /datum/controller/subsystem/statpanels/proc/immediate_send_stat_data(client/target)
