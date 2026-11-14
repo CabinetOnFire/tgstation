@@ -42,6 +42,10 @@ jobs:
         if: steps.maps.outputs.maps != '[]'
         run: bash tools/ci/install_rust_g.sh
 
+      - name: Install DreamLuau
+        if: steps.maps.outputs.maps != '[]'
+        run: bash tools/ci/install_dreamluau.sh
+
       - name: Check generated navmaps
         env:
           MAPS: ${{ steps.maps.outputs.maps }}
