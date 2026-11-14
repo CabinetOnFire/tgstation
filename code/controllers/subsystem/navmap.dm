@@ -496,7 +496,7 @@ SUBSYSTEM_DEF(navmap)
 				navmap_batch += list(x, y, z_level, 0, effective_cost_flags)
 			else
 				var/packed = value[1] & ~vertical_mask
-				for(var/dir in list(UP, DOWN))
+				for(var/dir in GLOB.verticals)
 					var/turf/vertical_destination = get_step_multiz(tile, dir)
 					if(vertical_destination && tile.zPassOut(dir) && vertical_destination.zPassIn(dir))
 						packed |= NAV_FLIGHT(dir)
@@ -647,7 +647,7 @@ SUBSYSTEM_DEF(navmap)
 		var/turf/neighbor = get_step(tile, dir)
 		if(neighbor)
 			record_startup_dirty_coordinate(neighbor)
-	for(var/dir in list(UP, DOWN))
+	for(var/dir in GLOB.verticals)
 		var/turf/neighbor = get_step_multiz(tile, dir)
 		if(!neighbor)
 			continue

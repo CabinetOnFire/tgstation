@@ -920,7 +920,7 @@ GLOBAL_LIST_EMPTY(station_turfs)
 			neighbor.nav_blockers = null
 			SSnavmap.queue_turf_bake(neighbor)
 			navmap_pathfinder_update(neighbor.x, neighbor.y, neighbor.z, 0, neighbor.get_nav_cost_flags())
-	for(var/dir in list(UP, DOWN))
+	for(var/dir in GLOB.verticals)
 		var/turf/neighbor = get_step_multiz(src, dir)
 		if(neighbor)
 			neighbor.nav_pass = null
@@ -968,7 +968,7 @@ GLOBAL_LIST_EMPTY(station_turfs)
 
 	// Raw vertical edges are intentionally available only to flying movers. Their
 	// destination remains at the same x/y on the adjacent mapped layer.
-	for(var/dir in list(UP, DOWN))
+	for(var/dir in GLOB.verticals)
 		var/turf/dest = get_step_multiz(src, dir)
 		if(!dest || !zPassOut(dir) || !dest.zPassIn(dir))
 			continue

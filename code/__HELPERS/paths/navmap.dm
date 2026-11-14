@@ -360,7 +360,7 @@
 	var/edges = 0
 	if(tile.nav_pass & NAV_BAKED)
 		// Check both possible z-level directions.
-		for(var/dir in list(UP, DOWN))
+		for(var/dir in GLOB.verticals)
 			if(tile.nav_pass & NAV_FLIGHT(dir))
 				edges |= dir
 	navmap_astar_edge_cache[cache_key] = edges
@@ -628,7 +628,7 @@
 				navmap_astar_queue_update(next, current, navmap_astar_g_score[current] + navmap_astar_step_cost(next, 10))
 		if(allow_multiz && navmap_astar_is_flying)
 			// Explore vertical neighbors for flying movers.
-			for(var/vertical_dir in list(UP, DOWN))
+			for(var/vertical_dir in GLOB.verticals)
 				// Neighbor on the adjacent z-level.
 				var/turf/vertical_next = get_step_multiz(current, vertical_dir)
 				if(navmap_astar_vertical_open(current, vertical_next, vertical_dir))
