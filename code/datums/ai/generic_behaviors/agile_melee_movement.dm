@@ -20,7 +20,7 @@
 	/// Percent chance per tick to take another step while loitering inside the standoff band.
 	var/jitter_chance = 100
 	/// time to stay planted until after a hit. Makes it a bit more fair to fight against.
-	var/wait_after_attack = 0.3 SECONDS
+	var/wait_after_attack = 0.4 SECONDS
 	/// If true, repath when a movable target moves. This only works with navmap movement.
 	var/update_movement_for_moving_target = FALSE
 	/// Set by on_movement_failed() when the movement system gives up pathing.
