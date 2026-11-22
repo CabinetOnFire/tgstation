@@ -97,11 +97,12 @@
 	for(var/turf/gen_turf as anything in gen_turfs)
 		var/closed = gen_turfs[gen_turf]
 		var/turf_type = closed ? closed_turf_type : open_turf_type
+		var/preserved_flags = gen_turf.turf_flags & (NO_RUINS | NO_LAVA_GEN)
 		var/turf/new_turf = new turf_type(gen_turf)
 		new_turfs[new_turf] = turf_type
 
-		if(gen_turf.turf_flags & NO_RUINS)
-			new_turf.turf_flags |= NO_RUINS
+		if(preserved_flags)
+			new_turf.turf_flags |= preserved_flags
 
 		CHECK_TICK
 

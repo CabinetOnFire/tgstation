@@ -247,7 +247,7 @@ GLOBAL_LIST_EMPTY(teleportlocs)
 	var/list/turfs = list()
 	for(var/turf/T in contents)
 		turfs += T
-	map_generator.generate_terrain(turfs, src)
+	map_generator.generate_terrain(turfs, src, terrain_generation_seed())
 
 /// Populate the previously generated terrain with mobs and objects
 /area/proc/RunTerrainPopulation()
@@ -266,7 +266,11 @@ GLOBAL_LIST_EMPTY(teleportlocs)
 	var/list/turfs = list()
 	for(var/turf/T in contents)
 		turfs += T
-	map_generator.generate_terrain(turfs, src)
+	map_generator.generate_terrain(turfs, src, terrain_generation_seed())
+
+/// Fixed seed for terrain generation, if this area uses one.
+/area/proc/terrain_generation_seed()
+	return null
 
 /// Gets own, or shared, map generator
 /area/proc/get_generator()

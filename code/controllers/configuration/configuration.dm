@@ -92,20 +92,7 @@
 		directory = _directory
 	if(entries)
 		CRASH("/datum/controller/configuration/Load() called more than once!")
-	configuration_errors ||= list()
-	InitEntries()
-	if(fexists("[directory]/config.txt") && LoadEntries("config.txt") <= 1)
-		var/list/legacy_configs = list("game_options.txt", "dbconfig.txt", "comms.txt")
-		for(var/I in legacy_configs)
-			if(fexists("[directory]/[I]"))
-				log_config("No $include directives found in config.txt! Loading legacy [legacy_configs.Join("/")] files...")
-				for(var/J in legacy_configs)
-					LoadEntries(J)
-				break
-	if (fexists("[directory]/dev_overrides.txt"))
-		LoadEntries("dev_overrides.txt")
-	if (fexists("[directory]/ezdb.txt"))
-		LoadEntries("ezdb.txt")
+	LoadConfigEntries()
 	loadmaplist(CONFIG_MAPS_FILE)
 	LoadMOTD()
 	LoadPolicy()
@@ -123,6 +110,25 @@
 	if (Master)
 		Master.OnConfigLoad()
 	process_config_errors()
+
+/// Load typed settings without starting the rest of the configuration controller.
+/// Pass specific entry types when the caller only needs a subset of the configuration.
+/datum/controller/configuration/proc/LoadConfigEntries(list/entry_types)
+	var/partial = !isnull(entry_types)
+	configuration_errors ||= list()
+	InitEntries(entry_types)
+	if(fexists("[directory]/config.txt") && LoadEntries("config.txt", partial = partial) <= 1)
+		var/list/legacy_configs = list("game_options.txt", "dbconfig.txt", "comms.txt")
+		for(var/I in legacy_configs)
+			if(fexists("[directory]/[I]"))
+				log_config("No $include directives found in config.txt! Loading legacy [legacy_configs.Join("/")] files...")
+				for(var/J in legacy_configs)
+					LoadEntries(J, partial = partial)
+				break
+	if (fexists("[directory]/dev_overrides.txt"))
+		LoadEntries("dev_overrides.txt", partial = partial)
+	if (fexists("[directory]/ezdb.txt"))
+		LoadEntries("ezdb.txt", partial = partial)
 
 /datum/controller/configuration/proc/full_wipe()
 	if(IsAdminAdvancedProcCall())
@@ -151,13 +157,15 @@
 	for(var/error_message in configuration_errors)
 		stack_trace(error_message)
 
-/datum/controller/configuration/proc/InitEntries()
+/datum/controller/configuration/proc/InitEntries(list/entry_types)
 	var/list/_entries = list()
 	entries = _entries
 	var/list/_entries_by_type = list()
 	entries_by_type = _entries_by_type
 
-	for(var/I in valid_subtypesof(/datum/config_entry)) //typesof is faster in this case
+	if (isnull(entry_types))
+		entry_types = valid_subtypesof(/datum/config_entry)
+	for(var/I in entry_types)
 		var/datum/config_entry/E = I
 		E = new I
 		var/esname = E.name
@@ -173,7 +181,7 @@
 	entries -= CE.name
 	entries_by_type -= CE.type
 
-/datum/controller/configuration/proc/LoadEntries(filename, list/stack = list())
+/datum/controller/configuration/proc/LoadEntries(filename, list/stack = list(), partial = FALSE)
 	if(IsAdminAdvancedProcCall())
 		return
 
@@ -235,15 +243,17 @@
 			if(!value)
 				log_config_error("Warning: Invalid $include directive: [value]")
 			else
-				LoadEntries("[subfolder][value]", stack)
+				LoadEntries("[subfolder][value]", stack, partial)
 				++.
 			continue
 
 		// Reset directive, used for setting a config value back to defaults. Useful for string list config types
 		if (entry == "$reset")
 			var/datum/config_entry/resetee = _entries[LOWER_TEXT(value)]
-			if (!value || !resetee)
+			if (!value || (!resetee && !partial))
 				log_config_error("Warning: invalid $reset directive: [value]")
+				continue
+			if (!resetee)
 				continue
 			resetee.set_default()
 			log_config("Reset configured value for [value] to original defaults")
@@ -251,7 +261,8 @@
 
 		var/datum/config_entry/E = _entries[entry]
 		if(!E)
-			log_config("Unknown setting in configuration: '[entry]'")
+			if (!partial)
+				log_config("Unknown setting in configuration: '[entry]'")
 			continue
 
 		if(lockthis)

@@ -456,6 +456,10 @@ BOMBCAP 20
 ## of ruins.
 LAVALAND_BUDGET 60
 
+# Set a seed to reproduce Lavaland terrain, lava rivers, and ruin placements.
+# Leave unset to choose a new seed each round.
+#LAVALAND_SEED example
+
 ## Ice Moon Budget
 ICEMOON_BUDGET 90
 

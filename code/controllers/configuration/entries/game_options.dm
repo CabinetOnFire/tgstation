@@ -333,6 +333,9 @@
 
 /datum/config_entry/flag/grey_assistants
 
+/datum/config_entry/string/lavaland_seed
+	default = ""
+
 /datum/config_entry/number/lavaland_budget
 	default = 60
 	integer = FALSE

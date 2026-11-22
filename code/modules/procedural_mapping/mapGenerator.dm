@@ -21,7 +21,7 @@
 	QDEL_LIST(modules)
 
 ///This proc will be ran by areas on Initialize, and provides the areas turfs as argument to allow for generation.
-/datum/map_generator/proc/generate_terrain(list/turfs, area/generate_in)
+/datum/map_generator/proc/generate_terrain(list/turfs, area/generate_in, generation_seed)
 	return
 
 /// Populate terrain with flora, fauna, features and basically everything that isn't a turf.

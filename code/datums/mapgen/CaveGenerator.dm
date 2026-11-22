@@ -1,3 +1,5 @@
+#define LAVALAND_SEEDED_GENERATION
+
 /// The random offset applied to square coordinates, causes intermingling at biome borders
 #define BIOME_RANDOM_SQUARE_DRIFT 2
 // Categories for spawned things
@@ -145,28 +147,32 @@
 	open_turf_types = expand_weights(weighted_open_turf_types)
 	closed_turf_types = expand_weights(weighted_closed_turf_types)
 
-/datum/map_generator/cave_generator/generate_terrain(list/turfs, area/generate_in)
+/datum/map_generator/cave_generator/generate_terrain(list/turfs, area/generate_in, generation_seed)
 	. = ..()
 	if(!(generate_in.area_flags_mapping & CAVES_ALLOWED))
 		return
 
 	if(length(possible_biomes))
-		return generate_terrain_with_biomes(turfs, generate_in)
+		return generate_terrain_with_biomes(turfs, generate_in, generation_seed)
 
 	var/start_time = REALTIMEOFDAY
 
-	string_gen = generate_cave(generate_in)
+	string_gen = generate_cave(generate_in, generation_seed)
+	var/datum/random_generation/turf_rng = new(generation_seed ? "[generation_seed]/turf-types" : null)
 
 	for(var/turf/gen_turf as anything in turfs) //Go through all the turfs and generate them
-		var/closed = string_gen[world.maxx * (gen_turf.y - 1) + gen_turf.x] != "1"
-		var/turf/new_turf = pick(closed ? closed_turf_types : open_turf_types)
+		var/tile_index = world.maxx * (gen_turf.y - 1) + gen_turf.x
+		var/closed = string_gen[tile_index] != "1"
+		var/list/choices = closed ? closed_turf_types : open_turf_types
+		var/turf/new_turf = choices[turf_rng.rand_range_at(tile_index - 1, 1, length(choices))]
 
 		// The assumption is this will be faster then changeturf, and changeturf isn't required since by this point
 		// The old tile hasn't got the chance to init yet
+		var/preserved_flags = gen_turf.turf_flags & (NO_RUINS | NO_LAVA_GEN)
 		new_turf = new new_turf(gen_turf)
 
-		if(gen_turf.turf_flags & NO_RUINS)
-			new_turf.turf_flags |= NO_RUINS
+		if(preserved_flags)
+			new_turf.turf_flags |= preserved_flags
 
 	var/message = "[name] terrain generation finished in [(REALTIMEOFDAY - start_time)/10]s!"
 	to_chat(world, span_boldannounce("[message]"), MESSAGE_TYPE_DEBUG)
@@ -180,7 +186,7 @@
  * This should only be called by `generate_terrain()`, if you have to call this,
  * you're probably doing something wrong.
  */
-/datum/map_generator/cave_generator/proc/generate_terrain_with_biomes(list/turf/turfs, area/generate_in)
+/datum/map_generator/cave_generator/proc/generate_terrain_with_biomes(list/turf/turfs, area/generate_in, generation_seed)
 	if(!(generate_in.area_flags_mapping & CAVES_ALLOWED))
 		return
 
@@ -188,7 +194,10 @@
 	var/heat_seed = null
 
 	// Make sure that all caves on the same z level generate smoothly regardless of the area
-	if (shared_seed)
+	if (generation_seed)
+		heat_seed = "[generation_seed]/heat"
+		humidity_seed = "[generation_seed]/humidity"
+	else if (shared_seed)
 		var/static/list/static_heat = null
 		var/static/list/static_humi = null
 		if (!static_heat)
@@ -207,7 +216,7 @@
 		heat_seed = rand(0, 50000)
 
 	var/start_time = REALTIMEOFDAY
-	string_gen = generate_cave(generate_in)
+	string_gen = generate_cave(generate_in, generation_seed)
 
 	var/humidity_gen = list()
 	humidity_gen[BIOME_HIGH_HUMIDITY] = rustg_dbp_generate("[humidity_seed]", "60", "[biome_stamp_size]", "[world.maxx]", "[high_heat_threshold]", "1.1")
@@ -226,13 +235,15 @@
 		)
 
 	var/list/to_generate = list()
+	var/datum/random_generation/drift_rng = new(generation_seed ? "[generation_seed]/biome-drift" : null)
 	for(var/turf/gen_turf as anything in turfs) //Go through all the turfs and generate them
-		var/closed = string_gen[world.maxx * (gen_turf.y - 1) + gen_turf.x] != "1"
+		var/tile_index = world.maxx * (gen_turf.y - 1) + gen_turf.x
+		var/closed = string_gen[tile_index] != "1"
 		var/datum/biome/selected_biome
 
 		// Here comes the meat of the biome code.
-		var/drift_x = clamp((gen_turf.x + rand(-BIOME_RANDOM_SQUARE_DRIFT, BIOME_RANDOM_SQUARE_DRIFT)), 1, world.maxx) // / perlin_zoom
-		var/drift_y = clamp((gen_turf.y + rand(-BIOME_RANDOM_SQUARE_DRIFT, BIOME_RANDOM_SQUARE_DRIFT)), 2, world.maxy) // / perlin_zoom
+		var/drift_x = clamp((gen_turf.x + drift_rng.rand_range_at(2 * (tile_index - 1), -BIOME_RANDOM_SQUARE_DRIFT, BIOME_RANDOM_SQUARE_DRIFT)), 1, world.maxx) // / perlin_zoom
+		var/drift_y = clamp((gen_turf.y + drift_rng.rand_range_at(2 * (tile_index - 1) + 1, -BIOME_RANDOM_SQUARE_DRIFT, BIOME_RANDOM_SQUARE_DRIFT)), 2, world.maxy) // / perlin_zoom
 
 		// Where we go in the generated string (generated outside of the loop for s p e e d)
 		var/coordinate = world.maxx * (drift_y - 1) + drift_x
@@ -245,7 +256,11 @@
 			BIOME_HIGH_HEAT : text2num(heat_gen[BIOME_MEDIUM_HEAT][coordinate]) ? BIOME_MEDIUM_HEAT : BIOME_LOW_HEAT
 
 		selected_biome = possible_biomes[heat_level][humidity_level]
-		LAZYSET(to_generate[selected_biome], gen_turf, closed)
+		var/list/biome_turfs = to_generate[selected_biome]
+		if (!biome_turfs)
+			biome_turfs = list()
+			to_generate[selected_biome] = biome_turfs
+		biome_turfs[gen_turf] = closed
 		CHECK_TICK
 
 	for(var/biome in to_generate)
@@ -424,7 +439,7 @@
 
 
 ///Generates the cave shape using Rust-G
-/datum/map_generator/cave_generator/proc/generate_cave(area/generate_in)
+/datum/map_generator/cave_generator/proc/generate_cave(area/generate_in, generation_seed)
 
 	///Loop through all the active ruins for this z-level and make a json format out of it so we can send it to the generator
 	var/list/active_ruins_list = list()
@@ -443,7 +458,7 @@
 
 	var/active_ruin_string = json_encode(active_ruins_list)
 
-	var/string_gen = rustg_cave_system_generator_generate("[world.maxx]", "[world.maxy]", active_ruin_string, "[min_bsp_size]","[max_ratio]", "[padding]", "[room_fill_percent]", "[corridor_width]","[loop_percent]", "[noise_percent]", "[ca_steps]", "[birth_limit]", "[survival_limit]", "[edges_are_alive]")
+	var/string_gen = rustg_cave_system_generator_generate("[world.maxx]", "[world.maxy]", active_ruin_string, "[min_bsp_size]","[max_ratio]", "[padding]", "[room_fill_percent]", "[corridor_width]","[loop_percent]", "[noise_percent]", "[ca_steps]", "[birth_limit]", "[survival_limit]", "[edges_are_alive]", generation_seed ? "[generation_seed]" : "")
 
 	return string_gen
 

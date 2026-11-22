@@ -142,6 +142,9 @@
 	map_generator = /datum/map_generator/cave_generator/lavaland
 	use_mapgen = FALSE
 
+/area/lavaland/terrain_generation_seed()
+	return SSmapping.lavaland_seed
+
 /area/lavaland/surface
 	name = "Lavaland"
 	icon_state = "explored"

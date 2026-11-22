@@ -1,4 +1,6 @@
-/datum/map_template/ruin/proc/try_to_place(z, list/allowed_areas_typecache, turf/forced_turf, clear_below)
+/datum/map_template/ruin/proc/try_to_place(z, list/allowed_areas_typecache, turf/forced_turf, clear_below, datum/random_generation/rng)
+	if (!rng)
+		rng = new
 	var/sanity = forced_turf ? 1 : PLACEMENT_TRIES
 	if(SSmapping.level_trait(z,ZTRAIT_ISOLATED_RUINS))
 		return reserve_isolated_level(z)
@@ -6,10 +8,10 @@
 		sanity--
 		var/width_border = TRANSITIONEDGE + SPACERUIN_MAP_EDGE_PAD + round(width / 2)
 		var/height_border = TRANSITIONEDGE + SPACERUIN_MAP_EDGE_PAD + round(height / 2)
-		var/turf/central_turf = forced_turf ? forced_turf : locate(rand(width_border, world.maxx - width_border), rand(height_border, world.maxy - height_border), z)
+		var/turf/central_turf = forced_turf ? forced_turf : locate(rng.rand_range(width_border, world.maxx - width_border), rng.rand_range(height_border, world.maxy - height_border), z)
 		var/valid = TRUE
 		var/list/affected_turfs = get_affected_turfs(central_turf,1)
-		var/list/affected_areas = list()
+		var/alist/affected_areas = alist()
 
 		for(var/turf/check in affected_turfs)
 			// Use assoc lists to move this out, it's easier that way
@@ -45,16 +47,20 @@
 	var/turf/center = locate(placement.x + round(width/2),placement.y + round(height/2),placement.z)
 	return center
 
+/// Types removed from the footprint when a ruin requests clear_below.
+/proc/ruin_clear_below_types()
+	return list(
+		/obj/structure/spawner,
+		/mob/living/simple_animal,
+		/obj/structure/flora,
+	)
+
 ///Loads a specified ruin that was previously reserved.
 /datum/map_template/ruin/proc/load_reserved(turf/central_turf, clear_below)
 	var/list/affected_turfs = get_affected_turfs(central_turf, 1)
 
 	if(clear_below)
-		var/static/list/clear_below_typecache = typecacheof(list(
-			/obj/structure/spawner,
-			/mob/living/simple_animal,
-			/obj/structure/flora
-		))
+		var/static/list/clear_below_typecache = typecacheof(ruin_clear_below_types())
 		for(var/turf/T as anything in affected_turfs)
 			for(var/atom/thing as anything in T)
 				if(clear_below_typecache[thing.type])
@@ -77,7 +83,7 @@
  * @param ruin_type The type of ruins that are spawning (ZTRAIT_SPACE_RUINS, ZTRAIT_ICE_RUINS, ZTRAIT_LAVA_RUINS, etc.)
  * @param immediate_load If TRUE, loads the placed ruins' maps in right away instead of leaving them queued in SSmapping.reserved_ruins for terrain generation to run first. Only safe to use outside of the roundstart mapping init sequence, once terrain generation has already finished.
  */
-/proc/seedRuins(list/z_levels = null, budget = 0, whitelist = list(/area/space), list/potentialRuins, clear_below = FALSE, mineral_budget = 15, mineral_budget_update, ruins_type = ZTRAIT_STATION, immediate_load = FALSE)
+/proc/seedRuins(list/z_levels = null, budget = 0, whitelist = list(/area/space), list/potentialRuins, clear_below = FALSE, mineral_budget = 15, mineral_budget_update, ruins_type = ZTRAIT_STATION, immediate_load = FALSE, datum/random_generation/rng)
 #if defined(CIBUILDING) && !defined(OPENDREAM)
 	if(SSmapping.current_map.is_unit_test_map && PERFORM_ALL_TESTS(maptest_log_mapping) )
 		return log_mapping("Skipping ruin seeding due to running on unit test map in workflow enviorment.")
@@ -94,10 +100,12 @@
 			WARNING("Z level [zl] does not exist - Not generating ruins")
 			return
 
+	if (!rng)
+		rng = new
 	var/list/ruins = potentialRuins.Copy()
 	var/placed_ruins = 0 // our count of how many ruins have been placed
-	var/list/forced_ruins = list() //These go first on the z level associated (same random one by default) or if the assoc value is a turf to the specified turf.
-	var/list/ruins_available = list() //we can try these in the current pass
+	var/alist/forced_ruins = alist() //These go first on the z level associated (same random one by default) or if the assoc value is a turf to the specified turf.
+	var/alist/ruins_available = alist() //we can try these in the current pass
 
 	if(PERFORM_ALL_TESTS(maptest_log_mapping))
 		log_mapping("All ruins being loaded for map testing.")
@@ -141,7 +149,7 @@
 				forced = TRUE
 				break
 		else //Otherwise just pick random one
-			current_pick = pick_weight(ruins_available)
+			current_pick = rng.pick_weighted(ruins_available)
 
 		var/placement_tries = forced_turf ? 1 : PLACEMENT_TRIES //Only try once if we target specific turf
 		var/failed_to_place = TRUE
@@ -150,7 +158,7 @@
 		outer:
 			while(placement_tries > 0)
 				placement_tries--
-				target_z = pick(z_levels)
+				target_z = z_levels[rng.rand_range(1, length(z_levels))]
 				if(forced_z)
 					target_z = forced_z
 				if(current_pick.always_spawn_with) //If the ruin has part below, make sure that z exists.
@@ -163,7 +171,7 @@
 								else
 									break outer
 
-				placed_turf = current_pick.try_to_place(target_z,whitelist_typecache,forced_turf,clear_below)
+				placed_turf = current_pick.try_to_place(target_z,whitelist_typecache,forced_turf,clear_below,rng)
 				if(!placed_turf)
 					continue
 				else
@@ -203,9 +211,9 @@
 								if(PLACE_SAME_Z)
 									forced_ruins[linked] = target_z //I guess you might want a chain somehow
 								if(PLACE_LAVA_RUIN)
-									forced_ruins[linked] = pick(SSmapping.levels_by_trait(ZTRAIT_LAVA_RUINS))
+									forced_ruins[linked] = rng.pick_from(SSmapping.levels_by_trait(ZTRAIT_LAVA_RUINS))
 								if(PLACE_SPACE_RUIN)
-									forced_ruins[linked] = pick(SSmapping.levels_by_trait(ZTRAIT_SPACE_RUINS))
+									forced_ruins[linked] = rng.pick_from(SSmapping.levels_by_trait(ZTRAIT_SPACE_RUINS))
 								if(PLACE_DEFAULT)
 									forced_ruins[linked] = -1
 								if(PLACE_BELOW)

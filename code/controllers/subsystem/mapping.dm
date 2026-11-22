@@ -13,6 +13,9 @@ SUBSYSTEM_DEF(mapping)
 	/// The current map config the server loaded at round start.
 	var/datum/map_config/current_map
 
+	/// Seed for Lavaland's terrain, rivers and ruin placement.
+	var/lavaland_seed
+
 	var/list/map_templates = list()
 
 	var/list/ruins_templates = list()
@@ -141,6 +144,9 @@ SUBSYSTEM_DEF(mapping)
 	determine_fake_sale()
 	require_area_resort()
 	process_teleport_locs() //Sets up the wizard teleport locations
+	if (current_map.minetype == MINETYPE_LAVALAND)
+		lavaland_seed = CONFIG_GET(string/lavaland_seed) || "[rand(1, 16777215)]"
+		log_mapping("Lavaland seed: [lavaland_seed]")
 	preloadTemplates()
 	#ifdef NAVMAP_BAKE_GENERATION
 	var/generating_navmap_bakes = TRUE
@@ -278,7 +284,7 @@ SUBSYSTEM_DEF(mapping)
 	// Generate mining ruins
 	var/list/lava_ruins = levels_by_trait(ZTRAIT_LAVA_RUINS)
 	if (lava_ruins.len)
-		seedRuins(lava_ruins, CONFIG_GET(number/lavaland_budget), list(/area/lavaland/surface/outdoors/unexplored), themed_ruins[ZTRAIT_LAVA_RUINS], clear_below = TRUE, mineral_budget = 15, mineral_budget_update = OREGEN_PRESET_LAVALAND, ruins_type = ZTRAIT_LAVA_RUINS)
+		reserve_lavaland_ruins(lava_ruins, CONFIG_GET(number/lavaland_budget))
 
 	var/list/ice_ruins = levels_by_trait(ZTRAIT_ICE_RUINS)
 	if (ice_ruins.len)
@@ -322,7 +328,7 @@ SUBSYSTEM_DEF(mapping)
 	// Generate mining ruins
 	var/list/lava_ruins = levels_by_trait(ZTRAIT_LAVA_RUINS)
 	for (var/lava_z in lava_ruins)
-		spawn_rivers(lava_z, 3, /turf/open/lava/smooth/lava_land_surface, /area/lavaland/surface/outdoors/unexplored) // +1 from the mapped in waypoint
+		carve_lavaland_rivers(lava_z)
 
 	var/list/ice_ruins = levels_by_trait(ZTRAIT_ICE_RUINS)
 	for (var/ice_z in ice_ruins)
@@ -558,12 +564,17 @@ GLOBAL_LIST_EMPTY(the_station_areas)
 	preloadShelterTemplates()
 	preloadHolodeckTemplates()
 
+/// Read the standard ruin blacklists used by mapping and procedural previews.
+/datum/controller/subsystem/mapping/proc/ruin_blacklist(include_lavaland)
+	var/list/banned = read_map_list("[global.config.directory]/spaceruinblacklist.txt")
+	if (include_lavaland)
+		banned += read_map_list("[global.config.directory]/lavaruinblacklist.txt")
+	return banned
+
 /datum/controller/subsystem/mapping/proc/preloadRuinTemplates()
-	// Still supporting bans by filename
-	var/list/banned = generateMapList("spaceruinblacklist.txt")
-	if(current_map.minetype == MINETYPE_LAVALAND)
-		banned += generateMapList("lavaruinblacklist.txt")
-	else if(current_map.blacklist_file)
+	var/is_lavaland = current_map.minetype == MINETYPE_LAVALAND
+	var/list/banned = ruin_blacklist(is_lavaland)
+	if (!is_lavaland && current_map.blacklist_file)
 		banned += generateMapList(current_map.blacklist_file)
 
 	for(var/item in sort_list(subtypesof(/datum/map_template/ruin), GLOBAL_PROC_REF(cmp_ruincost_priority)))
@@ -981,3 +992,33 @@ ADMIN_VERB(load_away_mission, R_FUN, "Load Away Mission", "Load a specific away 
 	if(webmap_included && !isnull(SSmapping.current_map.mapping_url))
 		text += " | <a href='byond://?action=openWebMap'>(Show Map)</a>"
 	return text
+
+
+/// Get repeatable random rolls for one part of mining map generation.
+/datum/controller/subsystem/mapping/proc/mining_random(stage)
+	return new /datum/random_generation(lavaland_seed ? "[lavaland_seed]/[stage]" : null)
+
+/// Reserves Lavaland footprints before cave generation begins.
+/datum/controller/subsystem/mapping/proc/reserve_lavaland_ruins(list/levels, budget, configure_ores = TRUE)
+	var/list/catalog = themed_ruins[ZTRAIT_LAVA_RUINS]
+	if (lavaland_seed)
+		var/list/templates = list()
+		for (var/name in catalog)
+			templates += catalog[name]
+		catalog = list()
+		for (var/datum/map_template/ruin/template as anything in sort_list(templates, GLOBAL_PROC_REF(cmp_seeded_ruin)))
+			catalog[template.name] = template
+	seedRuins(levels, budget, list(/area/lavaland/surface/outdoors/unexplored), catalog, clear_below = TRUE, mineral_budget = 15, mineral_budget_update = configure_ores ? OREGEN_PRESET_LAVALAND : null, ruins_type = ZTRAIT_LAVA_RUINS, rng = mining_random("ruins"))
+
+/proc/cmp_seeded_ruin(datum/map_template/ruin/first, datum/map_template/ruin/second)
+	if (first.cost != second.cost)
+		return first.cost - second.cost
+	return cmp_text_asc(first.mappath, second.mappath)
+
+/// Carves rivers after terrain generation and before reserved maps are stamped.
+/datum/controller/subsystem/mapping/proc/carve_lavaland_rivers(level, list/waypoints)
+	var/datum/random_generation/rng = mining_random("rivers")
+	if (isnull(waypoints))
+		spawn_rivers(level, 3, /turf/open/lava/smooth/lava_land_surface, /area/lavaland/surface/outdoors/unexplored, rng = rng)
+	else
+		generate_river_terrain(level, 3, /turf/open/lava/smooth/lava_land_surface, /area/lavaland/surface/outdoors/unexplored, waypoints, rng = rng)

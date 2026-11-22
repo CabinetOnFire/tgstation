@@ -173,7 +173,8 @@
 	always_place = TRUE
 
 /datum/map_template/ruin/lavaland/blood_drunk_miner/random/New()
-	suffix = pick("lavaland_surface_blooddrunk1.dmm", "lavaland_surface_blooddrunk2.dmm", "lavaland_surface_blooddrunk3.dmm")
+	var/datum/random_generation/rng = SSmapping.mining_random("blood-drunk-miner")
+	suffix = "lavaland_surface_blooddrunk[rng.rand_range(1, 3)].dmm"
 	return ..()
 
 /datum/map_template/ruin/lavaland/ufo_crash

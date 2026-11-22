@@ -70,9 +70,14 @@ GLOBAL_LIST_INIT(potentialConfigRandomZlevels, generate_map_list_from_directory(
 	id = AWAYSTART_UNDERGROUND
 
 /proc/generateMapList(filename)
+	return read_map_list("[global.config.directory]/[SANITIZE_FILENAME(filename)]")
+
+/// Read map entries from an already resolved path.
+/proc/read_map_list(path)
 	. = list()
-	filename = "[global.config.directory]/[SANITIZE_FILENAME(filename)]"
-	var/list/Lines = world.file2list(filename)
+	if (!fexists(path))
+		return
+	var/list/Lines = world.file2list(path)
 
 	if(!Lines.len)
 		return
