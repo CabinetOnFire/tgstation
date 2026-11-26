@@ -67,7 +67,7 @@
 	var/medium_humidity_threshold = -0.3
 	/// Should all generators on the same z level use the same seeds?
 	var/shared_seed = TRUE
-	/// Stamp size for DBP noise, aka frequency
+	/// Number of tiles per Perlin noise cell. Larger values make broader biomes.
 	var/biome_stamp_size = 75
 	/// Stored noise maps per z level if we use a shared seed
 	var/static_biome_maps = list()
@@ -221,12 +221,12 @@
 	string_gen = generate_cave(first_turf.z, generation_seed)
 
 	var/humidity_gen = list()
-	humidity_gen[BIOME_HIGH_HUMIDITY] = rustg_dbp_generate("[humidity_seed]", "60", "[biome_stamp_size]", "[world.maxx]", "[high_heat_threshold]", "1.1")
-	humidity_gen[BIOME_MEDIUM_HUMIDITY] = rustg_dbp_generate("[humidity_seed]", "60", "[biome_stamp_size]", "[world.maxx]", "[medium_heat_threshold]", "[high_heat_threshold]")
+	humidity_gen[BIOME_HIGH_HUMIDITY] = rustg_noise_perlin_map("[humidity_seed]", "[world.maxx]", "[world.maxy]", "[biome_stamp_size]", "[high_humidity_threshold]", "1.1")
+	humidity_gen[BIOME_MEDIUM_HUMIDITY] = rustg_noise_perlin_map("[humidity_seed]", "[world.maxx]", "[world.maxy]", "[biome_stamp_size]", "[medium_humidity_threshold]", "[high_humidity_threshold]")
 
 	var/heat_gen = list()
-	heat_gen[BIOME_HIGH_HEAT] = rustg_dbp_generate("[heat_seed]", "60", "[biome_stamp_size]", "[world.maxx]", "[high_heat_threshold]", "1.1")
-	heat_gen[BIOME_MEDIUM_HEAT] = rustg_dbp_generate("[heat_seed]", "60", "[biome_stamp_size]", "[world.maxx]", "[medium_heat_threshold]", "[high_heat_threshold]")
+	heat_gen[BIOME_HIGH_HEAT] = rustg_noise_perlin_map("[heat_seed]", "[world.maxx]", "[world.maxy]", "[biome_stamp_size]", "[high_heat_threshold]", "1.1")
+	heat_gen[BIOME_MEDIUM_HEAT] = rustg_noise_perlin_map("[heat_seed]", "[world.maxx]", "[world.maxy]", "[biome_stamp_size]", "[medium_heat_threshold]", "[high_heat_threshold]")
 
 	if (shared_seed)
 		static_biome_maps["[turfs[1].z]"] = list(

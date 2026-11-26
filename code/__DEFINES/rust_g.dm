@@ -427,6 +427,11 @@
 
 #define rustg_noise_get_at_coordinates(seed, x, y) RUSTG_CALL(RUST_G, "noise_get_at_coordinates")(seed, x, y)
 
+/// Returns a row-by-row string of 1s for Perlin samples in [lower_range, upper_range) and 0s elsewhere.
+/// Scale is the number of tiles per noise cell. Bounds use the raw noise range of -1 to 1.
+#define rustg_noise_perlin_map(seed, width, height, scale, lower_range, upper_range) \
+	RUSTG_CALL(RUST_G, "noise_perlin_map")(seed, width, height, scale, lower_range, upper_range)
+
 /**
  * Generates a 2D poisson disk distribution ('blue noise'), which is relatively uniform.
  *
