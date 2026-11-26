@@ -21,7 +21,7 @@ SUBSYSTEM_DEF(mapping)
 	var/list/ruins_templates = list()
 
 	///Assoc list of all ruins spawned, key center of ruin spawn -> value ruin instance
-	var/list/active_ruins = alist()
+	var/list/active_ruins = list()
 
 	///Ordered list of ruins that have been reserved. Each entry is list(ruin template, central turf, clear_below). Populated by seedRuins(), consumed by load_reserved_ruins().
 	var/list/reserved_ruins = list()
@@ -145,7 +145,7 @@ SUBSYSTEM_DEF(mapping)
 	require_area_resort()
 	process_teleport_locs() //Sets up the wizard teleport locations
 	if (current_map.minetype == MINETYPE_LAVALAND)
-		lavaland_seed = CONFIG_GET(string/lavaland_seed) || "[rand(1, 16777215)]"
+		lavaland_seed = "sneed" //CONFIG_GET(string/lavaland_seed) || "[rand(1, 16777215)]"
 		log_mapping("Lavaland seed: [lavaland_seed]")
 	preloadTemplates()
 	#ifdef NAVMAP_BAKE_GENERATION

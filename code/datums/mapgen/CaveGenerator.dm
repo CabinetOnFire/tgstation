@@ -149,7 +149,7 @@
 
 /datum/map_generator/cave_generator/generate_terrain(list/turfs, area/generate_in, generation_seed)
 	. = ..()
-	if(!(generate_in.area_flags_mapping & CAVES_ALLOWED))
+	if(!(generate_in.area_flags_mapping & CAVES_ALLOWED) || !length(turfs))
 		return
 
 	if(length(possible_biomes))
@@ -157,7 +157,8 @@
 
 	var/start_time = REALTIMEOFDAY
 
-	string_gen = generate_cave(generate_in, generation_seed)
+	var/turf/first_turf = turfs[1]
+	string_gen = generate_cave(first_turf.z, generation_seed)
 	var/datum/random_generation/turf_rng = new(generation_seed ? "[generation_seed]/turf-types" : null)
 
 	for(var/turf/gen_turf as anything in turfs) //Go through all the turfs and generate them
@@ -187,7 +188,7 @@
  * you're probably doing something wrong.
  */
 /datum/map_generator/cave_generator/proc/generate_terrain_with_biomes(list/turf/turfs, area/generate_in, generation_seed)
-	if(!(generate_in.area_flags_mapping & CAVES_ALLOWED))
+	if(!(generate_in.area_flags_mapping & CAVES_ALLOWED) || !length(turfs))
 		return
 
 	var/humidity_seed = null
@@ -216,7 +217,8 @@
 		heat_seed = rand(0, 50000)
 
 	var/start_time = REALTIMEOFDAY
-	string_gen = generate_cave(generate_in, generation_seed)
+	var/turf/first_turf = turfs[1]
+	string_gen = generate_cave(first_turf.z, generation_seed)
 
 	var/humidity_gen = list()
 	humidity_gen[BIOME_HIGH_HUMIDITY] = rustg_dbp_generate("[humidity_seed]", "60", "[biome_stamp_size]", "[world.maxx]", "[high_heat_threshold]", "1.1")
@@ -439,15 +441,15 @@
 
 
 ///Generates the cave shape using Rust-G
-/datum/map_generator/cave_generator/proc/generate_cave(area/generate_in, generation_seed)
+/datum/map_generator/cave_generator/proc/generate_cave(level, generation_seed)
 
 	///Loop through all the active ruins for this z-level and make a json format out of it so we can send it to the generator
 	var/list/active_ruins_list = list()
 
 	for(var/turf/bottom_left_turf in SSmapping.active_ruins)
-		var/datum/map_template/ruin/active_ruin = SSmapping.active_ruins[bottom_left_turf]
-		if(bottom_left_turf.z != generate_in.z)
+		if(bottom_left_turf.z != level)
 			continue
+		var/datum/map_template/ruin/active_ruin = SSmapping.active_ruins[bottom_left_turf]
 		active_ruins_list += list(list(
 			"x" = max(1, bottom_left_turf.x - active_ruin.terrain_padding),
 			"y" = max(1, bottom_left_turf.y - active_ruin.terrain_padding),

@@ -50,7 +50,7 @@
 #define RANDOM_GENERATION_BATCH_SIZE 128
 #define RANDOM_GENERATION_HEX_DIGITS "0123456789abcdef"
 #define RANDOM_GENERATION_SAMPLE_DIGITS 6
-#define RANDOM_GENERATION_SAMPLE_RANGE (1 << 24)
+#define RANDOM_GENERATION_SAMPLE_RANGE (2 ** 24)
 
 /// Seeded random rolls. Use the same seed to get the same draws again. Without a seed, this uses BYOND rng for a sneed
 /datum/random_generation

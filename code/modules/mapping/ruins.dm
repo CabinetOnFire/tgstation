@@ -104,8 +104,9 @@
 		rng = new
 	var/list/ruins = potentialRuins.Copy()
 	var/placed_ruins = 0 // our count of how many ruins have been placed
-	var/alist/forced_ruins = alist() //These go first on the z level associated (same random one by default) or if the assoc value is a turf to the specified turf.
-	var/alist/ruins_available = alist() //we can try these in the current pass
+	// Process these in insertion order so seeded picks match across engines.
+	var/list/forced_ruins = list() //These go first on the z level associated (same random one by default) or if the assoc value is a turf to the specified turf.
+	var/list/ruins_available = list() //we can try these in the current pass
 
 	if(PERFORM_ALL_TESTS(maptest_log_mapping))
 		log_mapping("All ruins being loaded for map testing.")
